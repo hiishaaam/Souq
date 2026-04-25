@@ -16,6 +16,9 @@ export interface Sale {
   totalPrice: number;
   paymentMethod: "Cash" | "UPI";
   timestamp: number;
+  batchId?: string;
+  receiptTotal?: number;
+  receiptItemCount?: number;
 }
 
 export interface Expense {
