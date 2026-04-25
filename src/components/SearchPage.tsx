@@ -37,12 +37,12 @@ export function SearchPage() {
   );
 
   return (
-    <div className="p-12 flex flex-col gap-12 w-full max-w-5xl mx-auto">
-      <div className="max-w-3xl mx-auto w-full text-center space-y-6">
-        <h1 className="font-serif text-5xl md:text-6xl leading-tight text-forest">
+    <div className="p-4 sm:p-8 md:p-12 flex flex-col gap-8 md:gap-12 w-full max-w-7xl mx-auto">
+      <div className="max-w-3xl mx-auto w-full text-center space-y-4 md:space-y-6">
+        <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl leading-tight text-forest">
           Premium Botanical <br/><span className="italic font-normal">Price Index</span>
         </h1>
-        <div className="relative max-w-xl mx-auto mt-8">
+        <div className="relative max-w-xl mx-auto mt-4 md:mt-8">
           <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
             <Search className="h-5 w-5 text-gold" />
           </div>
@@ -58,9 +58,9 @@ export function SearchPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="animate-pulse bg-white border-t-4 border-forest p-8 h-72">
+            <div key={i} className="animate-pulse bg-white border-t-4 border-forest p-6 h-48 flex flex-col justify-between">
               <div className="h-4 w-16 bg-sand-dark mb-4"></div>
               <div className="h-6 w-3/4 bg-sand-dark mb-2"></div>
               <div className="h-3 w-1/4 bg-sand-dark mt-4"></div>
@@ -68,7 +68,7 @@ export function SearchPage() {
           ))}
         </div>
       ) : filteredProducts.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
           {filteredProducts.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}

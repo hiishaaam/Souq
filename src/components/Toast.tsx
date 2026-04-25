@@ -17,9 +17,9 @@ export function Toast({ message, type, onClose }: ToastProps) {
   }, [onClose]);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
+    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:bottom-6 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
       <div className={cn(
-        "flex items-center space-x-3 px-4 py-4 rounded-xl shadow-xl shadow-forest/10 border max-w-sm w-full",
+        "flex items-center space-x-3 px-4 py-4 shadow-xl shadow-forest/10 border w-full max-w-sm md:max-w-md mx-auto md:ml-auto",
         type === "success" ? "bg-white border-gold text-forest" : "bg-red-50 border-red-200 text-red-800"
       )}>
         {type === "success" ? (

@@ -7,11 +7,12 @@ import { useState } from "react";
 import { Navbar } from "./components/Navbar";
 import { SearchPage } from "./components/SearchPage";
 import { ManagePage } from "./components/ManagePage";
+import { SalesPage } from "./components/SalesPage";
 import { Toast } from "./components/Toast";
 import { AnimatePresence, motion } from "motion/react";
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<"search" | "manage">("search");
+  const [currentView, setCurrentView] = useState<"search" | "manage" | "sales">("search");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const showToast = (message: string, type: "success" | "error") => {
@@ -27,6 +28,7 @@ export default function App() {
           {currentView === "search" && (
             <motion.div
               key="search"
+              className="h-full"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
@@ -38,12 +40,25 @@ export default function App() {
           {currentView === "manage" && (
             <motion.div
               key="manage"
+              className="h-full overflow-y-auto"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.2 }}
             >
               <ManagePage showToast={showToast} />
+            </motion.div>
+          )}
+          {currentView === "sales" && (
+            <motion.div
+              key="sales"
+              className="h-full"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <SalesPage showToast={showToast} />
             </motion.div>
           )}
         </AnimatePresence>

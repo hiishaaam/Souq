@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
 
 interface NavbarProps {
-  currentView: "search" | "manage";
-  onViewChange: (view: "search" | "manage") => void;
+  currentView: "search" | "manage" | "sales";
+  onViewChange: (view: "search" | "manage" | "sales") => void;
 }
 
 export function Navbar({ currentView, onViewChange }: NavbarProps) {
@@ -14,7 +14,7 @@ export function Navbar({ currentView, onViewChange }: NavbarProps) {
           SOUQ
         </span>
       </div>
-      <div className="flex gap-8 md:gap-10 text-sand text-[10px] font-bold tracking-[0.2em] uppercase">
+      <div className="flex gap-4 md:gap-10 text-sand text-[10px] sm:text-xs font-bold tracking-[0.2em] uppercase">
         <button
           onClick={() => onViewChange("search")}
           className={cn(
@@ -25,6 +25,17 @@ export function Navbar({ currentView, onViewChange }: NavbarProps) {
           )}
         >
           Search
+        </button>
+        <button
+          onClick={() => onViewChange("sales")}
+          className={cn(
+            "cursor-pointer pb-1 transition-all",
+            currentView === "sales"
+              ? "border-b-2 border-gold opacity-100"
+              : "border-b-2 border-transparent opacity-50 hover:opacity-100"
+          )}
+        >
+          Sales
         </button>
         <button
           onClick={() => onViewChange("manage")}

@@ -32,10 +32,29 @@ service cloud.firestore {
       return hasRequired && validTypes && validDesc && validSize;
     }
 
+    function isValidSale(data) {
+      let hasRequired = data.keys().hasAll(['productId', 'productName', 'quantity', 'totalPrice', 'paymentMethod', 'timestamp']);
+      let validTypes = data.productId is string && data.productId.size() > 0 && data.productId.size() <= 128
+          && data.productName is string && data.productName.size() > 0 && data.productName.size() <= 200
+          && data.quantity is number && data.quantity > 0
+          && data.totalPrice is number && data.totalPrice >= 0
+          && data.paymentMethod in ['Cash', 'UPI']
+          && data.timestamp is number;
+      return hasRequired && validTypes && data.keys().size() == 6;
+    }
+
+    function isValidExpense(data) {
+      let hasRequired = data.keys().hasAll(['name', 'amount', 'timestamp']);
+      let validTypes = data.name is string && data.name.size() > 0 && data.name.size() <= 200
+          && data.amount is number && data.amount >= 0
+          && data.timestamp is number;
+      return hasRequired && validTypes && data.keys().size() == 3;
+    }
+
     match /products/{productId} {
       // The user explicitly requested an app with NO AUTH, so any user can read and manage the catalog.
       
-      allow read: if isValidId(productId) || true; // Validated list and get
+      allow read: if true;
       
       allow create: if isValidId(productId) 
                     && isValidProduct(incoming());
@@ -45,6 +64,20 @@ service cloud.firestore {
                     && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'category', 'unit', 'price', 'description', 'updatedAt']);
                     
       allow delete: if isValidId(productId);
+    }
+    
+    match /sales/{saleId} {
+      allow read: if true;
+      allow create: if isValidId(saleId) && isValidSale(incoming());
+      allow update: if isValidId(saleId) && isValidSale(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['productId', 'productName', 'quantity', 'totalPrice', 'paymentMethod', 'timestamp']);
+      allow delete: if isValidId(saleId);
+    }
+    
+    match /expenses/{expenseId} {
+      allow read: if true;
+      allow create: if isValidId(expenseId) && isValidExpense(incoming());
+      allow update: if isValidId(expenseId) && isValidExpense(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'amount', 'timestamp']);
+      allow delete: if isValidId(expenseId);
     }
   }
 }
