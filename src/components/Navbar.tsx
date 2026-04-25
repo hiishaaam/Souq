@@ -7,7 +7,7 @@ interface NavbarProps {
 
 export function Navbar({ currentView, onViewChange }: NavbarProps) {
   return (
-    <nav className="sticky top-0 z-50 bg-forest px-6 py-5 md:px-12 flex justify-between items-center shadow-lg">
+    <nav className="sticky top-0 z-50 bg-forest px-6 pt-[calc(env(safe-area-inset-top)+2rem)] pb-5 md:px-12 flex justify-between items-center shadow-lg">
       <div className="flex items-center gap-3">
         <img src="/favicon.svg" alt="SOUQ Logo" className="h-10 w-10 object-contain" />
         <span className="text-sand font-serif text-2xl tracking-tighter">

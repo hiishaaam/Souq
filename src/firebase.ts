@@ -1,7 +1,20 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from "firebase/auth";
-import firebaseConfigFile from '../firebase-applet-config.json';
+import firebaseConfigFileRaw from '../firebase-applet-config.json';
+
+type FirebaseAppletConfig = {
+  apiKey?: string;
+  authDomain?: string;
+  projectId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+  measurementId?: string;
+  firestoreDatabaseId?: string;
+};
+
+const firebaseConfigFile = firebaseConfigFileRaw as FirebaseAppletConfig;
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfigFile.apiKey,
