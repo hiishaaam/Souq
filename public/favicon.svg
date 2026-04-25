@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="#1a3a2a">
+  <rect width="100" height="100" fill="#1a3a2a" />
+  
+  <g fill="none" stroke="#c9a84c" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Arch -->
+    <path d="M 28 80 V 55 C 28 50 18 45 18 35 C 18 20 35 15 50 5 C 65 15 82 20 82 35 C 82 45 72 50 72 55 V 80 H 52" />
+    <path d="M 28 80 H 50" />
+    
+    <!-- Wheat Stem -->
+    <path d="M 50 80 V 22" stroke-width="2" />
+  </g>
+  
+  <g fill="#c9a84c" stroke="none">
+    <!-- Wheat Leaf Bottom Right -->
+    <path d="M 51 72 C 65 72 72 58 66 48 C 58 55 52 60 51 72" /> <!-- bigger leaf -->
+    
+    <!-- Left Grains -->
+    <path d="M 48 60 C 37 60 37 47 43 47 C 49 47 49 53 48 60" />
+    <path d="M 48 50 C 39 50 39 39 44 39 C 49 39 49 44 48 50" />
+    <path d="M 48 40 C 41 40 41 31 45 31 C 49 31 49 35 48 40" />
+
+    <!-- Right Grains -->
+    <path d="M 52 56 C 61 56 61 45 56 45 C 51 45 51 50 52 56" />
+    <path d="M 52 46 C 59 46 59 37 55 37 C 51 37 51 41 52 46" />
+    <path d="M 52 36 C 58 36 58 28 54 28 C 51 28 51 32 52 36" />
+
+    <!-- Top Grain -->
+    <path d="M 50 30 C 45 22 50 16 50 16 C 50 16 55 22 50 30" />
+  </g>
+</svg>

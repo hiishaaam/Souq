@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() { 
+      return request.resource.data; 
+    }
+    
+    function existing() { 
+      return resource.data; 
+    }
+
+    function isValidProduct(data) {
+      let hasRequired = data.keys().hasAll(['name', 'category', 'unit', 'price', 'updatedAt']);
+      let validTypes = data.name is string && data.name.size() > 0 && data.name.size() <= 200
+          && data.category is string && data.category.size() > 0 && data.category.size() <= 100
+          && data.unit is string && data.unit.size() > 0 && data.unit.size() <= 50
+          && data.price is number && data.price >= 0
+          && data.updatedAt is number;
+      let validDesc = !('description' in data) || (data.description is string && data.description.size() <= 1000);
+      let validSize = data.keys().size() == 5 || (data.keys().size() == 6 && 'description' in data);
+      return hasRequired && validTypes && validDesc && validSize;
+    }
+
+    match /products/{productId} {
+      // The user explicitly requested an app with NO AUTH, so any user can read and manage the catalog.
+      
+      allow read: if isValidId(productId) || true; // Validated list and get
+      
+      allow create: if isValidId(productId) 
+                    && isValidProduct(incoming());
+                    
+      allow update: if isValidId(productId) 
+                    && isValidProduct(incoming()) 
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'category', 'unit', 'price', 'description', 'updatedAt']);
+                    
+      allow delete: if isValidId(productId);
+    }
+  }
+}

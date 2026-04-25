@@ -1,0 +1,23 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A fertilizer product in the shop catalog.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "unit": { "type": "string" },
+        "price": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "category", "unit", "price", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Products catalog, fully open for an authentic shop view."
+    }
+  }
+}
