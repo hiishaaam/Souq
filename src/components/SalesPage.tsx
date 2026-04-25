@@ -1,21 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { collection, onSnapshot, query, addDoc, doc, deleteDoc, where, orderBy, writeBatch } from "firebase/firestore";
+import { collection, onSnapshot, query, addDoc, serverTimestamp, setDoc, doc, deleteDoc, where, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 import { Product, Sale, Expense } from "../types";
-import { Download, Trash2, Calculator, IndianRupee, ArrowDown, ArrowUp, ShoppingCart, ReceiptText } from "lucide-react";
+import { Plus, Download, Trash2, Edit2, CheckCircle2, ChevronRight, Calculator, IndianRupee, ArrowDown, ArrowUp } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { startOfDay, endOfDay, format } from "date-fns";
 import { ProductModal } from "./ProductModal";
-
-type CartItem = {
-  productId: string;
-  productName: string;
-  unit: string;
-  unitPrice: number;
-  quantity: number;
-  totalPrice: number;
-};
 
 export function SalesPage({ showToast }: { showToast: (msg: string, type: "success" | "error") => void }) {
   const [sales, setSales] = useState<Sale[]>([]);
@@ -27,7 +18,6 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
   const [quantity, setQuantity] = useState("1");
   const [totalPrice, setTotalPrice] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"Cash" | "UPI">("Cash");
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [expenseName, setExpenseName] = useState("");
@@ -119,63 +109,7 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
     }
   }, [selectedProductId, quantity, products]);
 
-  const cartTotal = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
-  const cartQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-
-  const getSaleTimestamp = () => {
-    const selectedD = new Date(dateStr);
-    const isToday = format(new Date(), "yyyy-MM-dd") === dateStr;
-    return isToday ? Date.now() : selectedD.getTime() + 1000 * 60 * 60 * 12;
-  };
-
-  const resetProductEntry = () => {
-    setSelectedProductId("");
-    setProductSearchTerm("");
-    setQuantity("1");
-    setTotalPrice("");
-  };
-
-  const createReceiptPdf = (
-    receiptId: string,
-    items: CartItem[],
-    method: "Cash" | "UPI",
-    timestamp: number
-  ) => {
-    const doc = new jsPDF();
-    const receiptTotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-    const receiptQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.text("SOUQ", 14, 20);
-    doc.setFontSize(14);
-    doc.text("Sales Receipt", 14, 30);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Receipt: ${receiptId}`, 14, 40);
-    doc.text(`Date: ${format(timestamp, "PPpp")}`, 14, 46);
-    doc.text(`Payment: ${method}`, 14, 52);
-
-    autoTable(doc, {
-      startY: 60,
-      head: [["Product", "Qty", "Rate", "Amount"]],
-      body: items.map(item => [
-        item.productName,
-        item.quantity.toString(),
-        item.unitPrice.toFixed(2),
-        item.totalPrice.toFixed(2)
-      ]),
-      theme: "striped",
-      headStyles: { fillColor: [26, 58, 42] },
-      footStyles: { fillColor: [201, 168, 76], textColor: [26, 58, 42], fontStyle: "bold" },
-      foot: [["TOTAL", receiptQuantity.toString(), "", `Rs. ${receiptTotal.toFixed(2)}`]]
-    });
-
-    doc.save(`SOUQ_Receipt_${receiptId}.pdf`);
-  };
-
-  const handleAddToCart = (e: React.FormEvent) => {
+  const handleAddSale = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProductId || !quantity || !totalPrice) {
       showToast("Please fill all required fields", "error");
@@ -185,90 +119,35 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
     const product = products.find(p => p.id === selectedProductId);
     if (!product) return;
 
-    const parsedQuantity = parseFloat(quantity);
-    const parsedTotal = parseFloat(totalPrice);
-    if (Number.isNaN(parsedQuantity) || parsedQuantity <= 0 || Number.isNaN(parsedTotal) || parsedTotal < 0) {
-      showToast("Please enter a valid quantity and amount", "error");
-      return;
-    }
-
-    const cartItem: CartItem = {
-      productId: product.id!,
-      productName: product.name,
-      unit: product.unit,
-      unitPrice: parsedQuantity > 0 ? parsedTotal / parsedQuantity : product.price,
-      quantity: parsedQuantity,
-      totalPrice: parsedTotal
-    };
-
-    setCartItems(prev => {
-      const existing = prev.find(item => item.productId === cartItem.productId);
-      if (!existing) return [...prev, cartItem];
-
-      return prev.map(item => {
-        if (item.productId !== cartItem.productId) return item;
-        const nextQuantity = item.quantity + cartItem.quantity;
-        const nextTotal = item.totalPrice + cartItem.totalPrice;
-        return {
-          ...item,
-          quantity: nextQuantity,
-          totalPrice: nextTotal,
-          unitPrice: nextTotal / nextQuantity
-        };
-      });
-    });
-
-    showToast("Item added to cart", "success");
-    resetProductEntry();
-  };
-
-  const handleRemoveCartItem = (productId: string) => {
-    setCartItems(prev => prev.filter(item => item.productId !== productId));
-  };
-
-  const handleCheckout = async () => {
-    if (cartItems.length === 0) {
-      showToast("Add at least one item to checkout", "error");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      const receiptId =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}`;
-      const timestamp = getSaleTimestamp();
-      const batch = writeBatch(db);
+      const newSale: Omit<Sale, "id"> = {
+        productId: product.id!,
+        productName: product.name,
+        quantity: parseFloat(quantity),
+        totalPrice: parseFloat(totalPrice),
+        paymentMethod,
+        timestamp: Date.now() // For backdating, could use `new Date(dateStr).getTime()` but we just use insert time
+      };
 
-      cartItems.forEach(item => {
-        const saleRef = doc(collection(db, "sales"));
-        const newSale: Omit<Sale, "id"> = {
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          totalPrice: item.totalPrice,
-          paymentMethod,
-          timestamp,
-          batchId: receiptId,
-          receiptTotal: cartTotal,
-          receiptItemCount: cartItems.length
-        };
-        batch.set(saleRef, newSale);
-      });
-
-      await batch.commit();
-      try {
-        createReceiptPdf(receiptId, cartItems, paymentMethod, timestamp);
-        showToast("Checkout recorded and receipt downloaded!", "success");
-      } catch (pdfError) {
-        console.error("Receipt PDF failed: ", pdfError);
-        showToast("Checkout recorded, but receipt PDF failed to download.", "error");
+      // Since sales might be logged later, maybe prompt if they want backdated? 
+      // For simplicity let's use Date.now() but if dateStr is not today we should use dateStr time.
+      const selectedD = new Date(dateStr);
+      const isToday = format(new Date(), "yyyy-MM-dd") === dateStr;
+      if (!isToday) {
+        newSale.timestamp = selectedD.getTime() + 1000 * 60 * 60 * 12; // Noon of that day
       }
-      setCartItems([]);
-      resetProductEntry();
+
+      await addDoc(collection(db, "sales"), newSale);
+      showToast("Sale recorded!", "success");
+      
+      // Reset form (keep the same date, reset product)
+      setSelectedProductId("");
+      setProductSearchTerm("");
+      setQuantity("1");
+      setTotalPrice("");
     } catch (e: any) {
-      showToast("Failed to record checkout: " + e.message, "error");
+      showToast("Failed to record sale: " + e.message, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -395,11 +274,11 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
 
   return (
     <div className="h-full flex flex-col md:flex-row bg-[#fcfaf7] overflow-y-auto md:overflow-hidden">
-      {/* LEFT: Checkout Cart */}
+      {/* LEFT: Add Sale Form */}
       <div className="w-full lg:w-[30%] md:h-full bg-white border-r border-gold/20 p-4 sm:p-6 md:overflow-y-auto flex flex-col shadow-sm shrink-0">
-        <h2 className="font-serif tracking-tight text-2xl md:text-3xl text-forest mb-4 md:mb-6">Checkout Cart</h2>
+        <h2 className="font-serif tracking-tight text-2xl md:text-3xl text-forest mb-4 md:mb-6">New Sale</h2>
         
-        <form onSubmit={handleAddToCart} className="flex flex-col gap-5">
+        <form onSubmit={handleAddSale} className="flex flex-col gap-5">
           <div className="relative" ref={dropdownRef}>
             <label className="block text-[10px] font-bold tracking-[0.2em] uppercase text-forest/60 mb-2">Product</label>
             <input
@@ -505,72 +384,19 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
 
           <button
             type="submit"
-            disabled={!selectedProductId}
+            disabled={isSubmitting || !selectedProductId}
             className="w-full mt-4 bg-gold hover:bg-[#d4b05a] text-forest font-bold tracking-widest uppercase text-xs py-4 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
           >
-            <ShoppingCart size={16} />
-            Add to Cart
-          </button>
-        </form>
-
-        <div className="mt-8 border border-gold/20 bg-[#fcfaf7] p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3 border-b border-gold/20 pb-3">
-            <div>
-              <h3 className="font-serif text-xl text-forest">Current Bill</h3>
-              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-forest/50 mt-1">
-                {cartItems.length} items &bull; Qty {cartQuantity}
-              </p>
-            </div>
-            <span className="font-serif text-2xl text-forest">₹{cartTotal.toFixed(0)}</span>
-          </div>
-
-          {cartItems.length === 0 ? (
-            <div className="py-6 text-center text-forest/50">
-              <ShoppingCart size={28} className="mx-auto mb-3 opacity-50" />
-              <p className="font-serif text-lg">Cart is empty</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gold/10">
-              {cartItems.map(item => (
-                <div key={item.productId} className="py-3 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h4 className="font-semibold text-sm text-forest truncate">{item.productName}</h4>
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-forest/50 mt-1">
-                      {item.quantity} {item.unit} &bull; ₹{item.unitPrice.toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="text-right flex items-center gap-2 shrink-0">
-                    <span className="font-serif text-lg text-forest">₹{item.totalPrice.toFixed(0)}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveCartItem(item.productId)}
-                      className="p-2 text-red-700/60 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors"
-                      aria-label={`Remove ${item.productName}`}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={handleCheckout}
-            disabled={isSubmitting || cartItems.length === 0}
-            className="w-full mt-4 bg-forest hover:bg-forest/90 text-sand font-bold tracking-widest uppercase text-xs py-4 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-          >
             {isSubmitting ? (
-              <span className="animate-pulse">Checking Out...</span>
+              <span className="animate-pulse">Recording...</span>
             ) : (
               <>
-                <ReceiptText size={16} />
-                Checkout & Receipt
+                <CheckCircle2 size={16} />
+                Record Sale
               </>
             )}
           </button>
-        </div>
+        </form>
 
         <div className="mt-10 pt-8 border-t border-gold/20">
           <h2 className="font-serif tracking-tight text-xl md:text-2xl text-forest mb-4">Add Expense</h2>
