@@ -24,18 +24,3 @@ export interface Expense {
   amount: number;
   timestamp: number;
 }
-
-export interface DailyCash {
-  id?: string;
-  date: string;
-  openingCash: number;
-  updatedAt: number;
-}
-
-export interface CreditCollection {
-  id?: string;
-  customerName: string;
-  amount: number;
-  paymentMethod: "Cash" | "UPI";
-  timestamp: number;
-}

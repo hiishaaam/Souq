@@ -51,23 +51,6 @@ service cloud.firestore {
       return hasRequired && validTypes && data.keys().size() == 3;
     }
 
-    function isValidDailyCash(data) {
-      let hasRequired = data.keys().hasAll(['date', 'openingCash', 'updatedAt']);
-      let validTypes = data.date is string && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-          && data.openingCash is number && data.openingCash >= 0
-          && data.updatedAt is number;
-      return hasRequired && validTypes && data.keys().size() == 3;
-    }
-
-    function isValidCreditCollection(data) {
-      let hasRequired = data.keys().hasAll(['customerName', 'amount', 'paymentMethod', 'timestamp']);
-      let validTypes = data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 200
-          && data.amount is number && data.amount > 0
-          && data.paymentMethod in ['Cash', 'UPI']
-          && data.timestamp is number;
-      return hasRequired && validTypes && data.keys().size() == 4;
-    }
-
     match /products/{productId} {
       // The user explicitly requested an app with NO AUTH, so any user can read and manage the catalog.
       
@@ -97,19 +80,5 @@ service cloud.firestore {
       allow delete: if isValidId(expenseId);
     }
 
-    match /dailyCash/{cashDate} {
-      allow read: if true;
-      allow create, update: if isValidId(cashDate)
-                            && cashDate == incoming().date
-                            && isValidDailyCash(incoming());
-      allow delete: if isValidId(cashDate);
-    }
-
-    match /creditCollections/{creditId} {
-      allow read: if true;
-      allow create: if isValidId(creditId) && isValidCreditCollection(incoming());
-      allow update: if isValidId(creditId) && isValidCreditCollection(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['customerName', 'amount', 'paymentMethod', 'timestamp']);
-      allow delete: if isValidId(creditId);
-    }
   }
 }

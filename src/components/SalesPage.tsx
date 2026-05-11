@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
 import { collection, onSnapshot, query, addDoc, setDoc, doc, deleteDoc, where, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
-import { Product, Sale, Expense, DailyCash, CreditCollection } from "../types";
+import { Product, Sale, Expense } from "../types";
 import { Download, Trash2, CheckCircle2, Calculator, IndianRupee, ArrowDown, ArrowUp, HandCoins, Save } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { startOfDay, endOfDay, format } from "date-fns";
 import { ProductModal } from "./ProductModal";
 
+const OPENING_CASH_PRODUCT_ID = "opening-cash";
+const CREDIT_COLLECTION_PRODUCT_ID = "credit-payment";
+
 export function SalesPage({ showToast }: { showToast: (msg: string, type: "success" | "error") => void }) {
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [creditCollections, setCreditCollections] = useState<CreditCollection[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -76,6 +78,8 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
     const unsubSales = onSnapshot(q, (snapshot) => {
       const s = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Sale));
       setSales(s);
+      const openingCashSale = s.find(sale => sale.productId === OPENING_CASH_PRODUCT_ID);
+      setOpeningCash(openingCashSale ? openingCashSale.totalPrice.toString() : "0");
       setIsLoading(false);
     }, (error) => {
       console.error("Error fetching sales: ", error);
@@ -98,38 +102,9 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
       showToast("Error loading expenses. " + error.message, "error");
     });
 
-    const unsubDailyCash = onSnapshot(doc(db, "dailyCash", dateStr), (snapshot) => {
-      if (snapshot.exists()) {
-        const data = { id: snapshot.id, ...snapshot.data() } as DailyCash;
-        setOpeningCash(data.openingCash.toString());
-      } else {
-        setOpeningCash("0");
-      }
-    }, (error) => {
-      console.error("Error fetching opening cash: ", error);
-      showToast("Error loading opening cash. " + error.message, "error");
-    });
-
-    const creditQuery = query(
-      collection(db, "creditCollections"),
-      where("timestamp", ">=", start),
-      where("timestamp", "<=", end),
-      orderBy("timestamp", "desc")
-    );
-
-    const unsubCreditCollections = onSnapshot(creditQuery, (snapshot) => {
-      const c = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as CreditCollection));
-      setCreditCollections(c);
-    }, (error) => {
-      console.error("Error fetching credit collections: ", error);
-      showToast("Error loading credit collections. " + error.message, "error");
-    });
-
     return () => {
       unsubSales();
       unsubExpenses();
-      unsubDailyCash();
-      unsubCreditCollections();
     };
   }, [dateStr]);
 
@@ -151,6 +126,12 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
     const isToday = format(new Date(), "yyyy-MM-dd") === dateStr;
     return isToday ? Date.now() : selectedD.getTime() + 1000 * 60 * 60 * 12;
   };
+
+  const openingCashRecord = sales.find(sale => sale.productId === OPENING_CASH_PRODUCT_ID);
+  const creditCollections = sales.filter(sale => sale.productId === CREDIT_COLLECTION_PRODUCT_ID);
+  const regularSales = sales.filter(sale => 
+    sale.productId !== OPENING_CASH_PRODUCT_ID && sale.productId !== CREDIT_COLLECTION_PRODUCT_ID
+  );
 
   const handleAddSale = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,11 +228,20 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
 
     setIsSavingOpeningCash(true);
     try {
-      await setDoc(doc(db, "dailyCash", dateStr), {
-        date: dateStr,
-        openingCash: amount,
-        updatedAt: Date.now()
-      } satisfies Omit<DailyCash, "id">);
+      const openingCashSale: Omit<Sale, "id"> = {
+        productId: OPENING_CASH_PRODUCT_ID,
+        productName: "Yesterday Remaining Cash",
+        quantity: 1,
+        totalPrice: amount,
+        paymentMethod: "Cash",
+        timestamp: getSelectedDateTimestamp()
+      };
+
+      if (openingCashRecord?.id) {
+        await setDoc(doc(db, "sales", openingCashRecord.id), openingCashSale);
+      } else {
+        await addDoc(collection(db, "sales"), openingCashSale);
+      }
       showToast("Opening cash saved.", "success");
     } catch (err: any) {
       showToast("Failed to save opening cash: " + err.message, "error");
@@ -275,14 +265,16 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
 
     setIsSubmittingCredit(true);
     try {
-      const newCreditCollection: Omit<CreditCollection, "id"> = {
-        customerName: creditCustomerName,
-        amount,
+      const newCreditCollection: Omit<Sale, "id"> = {
+        productId: CREDIT_COLLECTION_PRODUCT_ID,
+        productName: `Credit: ${creditCustomerName}`,
+        quantity: 1,
+        totalPrice: amount,
         paymentMethod: creditPaymentMethod,
         timestamp: getSelectedDateTimestamp()
       };
 
-      await addDoc(collection(db, "creditCollections"), newCreditCollection);
+      await addDoc(collection(db, "sales"), newCreditCollection);
       showToast("Credit payment recorded!", "success");
       setCreditCustomerName("");
       setCreditAmount("");
@@ -297,7 +289,7 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
   const handleDeleteCreditCollection = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this credit payment?")) {
       try {
-        await deleteDoc(doc(db, "creditCollections", id));
+        await deleteDoc(doc(db, "sales", id));
         showToast("Credit payment deleted.", "success");
       } catch (err: any) {
         showToast("Error deleting credit payment: " + err.message, "error");
@@ -338,7 +330,7 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
     autoTable(doc, {
       startY: salesStartY,
       head: [["Product", "Qty", "Pay Method", "Amount"]],
-      body: sales.map(s => [
+      body: regularSales.map(s => [
         s.productName,
         s.quantity.toString(),
         s.paymentMethod,
@@ -348,8 +340,8 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
       headStyles: { fillColor: [30, 60, 40] },
       footStyles: { fillColor: [240, 240, 240], textColor: [0,0,0], fontStyle: "bold" },
       foot: [
-        ["Total Cash", "", "", sales.filter(s => s.paymentMethod === "Cash").reduce((sum, s) => sum + s.totalPrice, 0).toFixed(2)],
-        ["Total UPI", "", "", sales.filter(s => s.paymentMethod === "UPI").reduce((sum, s) => sum + s.totalPrice, 0).toFixed(2)],
+        ["Total Cash", "", "", totalCash.toFixed(2)],
+        ["Total UPI", "", "", totalUPI.toFixed(2)],
         ["Credit Received", "", "", totalCredit.toFixed(2)],
         ["Total Expenses", "", "", expenses.reduce((sum, e) => sum + e.amount, 0).toFixed(2)],
         ["CASH IN TABLE", "", "", `Rs. ${cashInTable.toFixed(2)}`]
@@ -362,9 +354,9 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
         startY: creditStartY,
         head: [["Credit Customer", "Pay Method", "Amount"]],
         body: creditCollections.map(c => [
-          c.customerName,
+          c.productName.replace(/^Credit:\s*/, ""),
           c.paymentMethod,
-          c.amount.toFixed(2)
+          c.totalPrice.toFixed(2)
         ]),
         theme: "striped",
         headStyles: { fillColor: [201, 168, 76], textColor: [30, 60, 40] }
@@ -374,12 +366,12 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
     doc.save(`Sales_Report_${dateStr}.pdf`);
   };
 
-  const totalCash = sales.filter(s => s.paymentMethod === "Cash").reduce((acc, s) => acc + s.totalPrice, 0);
-  const totalUPI = sales.filter(s => s.paymentMethod === "UPI").reduce((acc, s) => acc + s.totalPrice, 0);
+  const totalCash = regularSales.filter(s => s.paymentMethod === "Cash").reduce((acc, s) => acc + s.totalPrice, 0);
+  const totalUPI = regularSales.filter(s => s.paymentMethod === "UPI").reduce((acc, s) => acc + s.totalPrice, 0);
   const totalExpense = expenses.reduce((acc, e) => acc + e.amount, 0);
   const openingCashNumber = parseFloat(openingCash) || 0;
-  const totalCreditCash = creditCollections.filter(c => c.paymentMethod === "Cash").reduce((acc, c) => acc + c.amount, 0);
-  const totalCreditUPI = creditCollections.filter(c => c.paymentMethod === "UPI").reduce((acc, c) => acc + c.amount, 0);
+  const totalCreditCash = creditCollections.filter(c => c.paymentMethod === "Cash").reduce((acc, c) => acc + c.totalPrice, 0);
+  const totalCreditUPI = creditCollections.filter(c => c.paymentMethod === "UPI").reduce((acc, c) => acc + c.totalPrice, 0);
   const totalCredit = totalCreditCash + totalCreditUPI;
   const cashInTable = openingCashNumber + totalCash + totalCreditCash - totalExpense;
 
@@ -722,14 +714,14 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
           <h3 className="text-[10px] font-bold tracking-[0.2em] uppercase text-forest/60 mb-4 border-b border-gold/20 pb-2">Records</h3>
           {isLoading ? (
             <div className="text-center py-10 opacity-50 font-serif">Loading...</div>
-          ) : sales.length === 0 ? (
+          ) : regularSales.length === 0 ? (
             <div className="text-center py-10 border border-dashed border-gold/50 flex flex-col items-center justify-center text-forest/50">
               <Calculator size={32} className="mb-4 opacity-50" />
               <p className="font-serif text-xl">No sales found on this date.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {sales.map((sale) => (
+              {regularSales.map((sale) => (
                 <div key={sale.id} className="bg-white p-4 border border-gold/10 flex items-center justify-between group shadow-sm hover:border-gold/40 transition-colors">
                   <div className="flex-1">
                     <h4 className="font-serif text-xl text-forest">{sale.productName}</h4>
@@ -765,13 +757,13 @@ export function SalesPage({ showToast }: { showToast: (msg: string, type: "succe
               {creditCollections.map((credit) => (
                 <div key={credit.id} className="bg-white p-4 border border-gold/10 flex items-center justify-between group shadow-sm hover:border-gold/40 transition-colors">
                   <div className="flex-1">
-                    <h4 className="font-serif text-xl text-forest">{credit.customerName}</h4>
+                    <h4 className="font-serif text-xl text-forest">{credit.productName.replace(/^Credit:\s*/, "")}</h4>
                     <p className="text-xs text-forest/60 uppercase tracking-widest font-bold mt-1">
                       Credit Payment &nbsp;&bull;&nbsp; {credit.paymentMethod} &nbsp;&bull;&nbsp; {format(credit.timestamp, "hh:mm a")}
                     </p>
                   </div>
                   <div className="text-right flex items-center gap-4">
-                    <span className="font-serif text-xl text-forest">₹{credit.amount}</span>
+                    <span className="font-serif text-xl text-forest">₹{credit.totalPrice}</span>
                     <button 
                       onClick={() => handleDeleteCreditCollection(credit.id!)}
                       className="md:opacity-0 group-hover:opacity-100 transition-opacity p-2 text-red-700/60 hover:text-red-700 hover:bg-red-50 rounded-full"
